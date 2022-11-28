@@ -6,7 +6,7 @@ mod pcntl;
 mod profiling;
 mod sapi;
 
-use crate::bindings::sapi_globals;
+use crate::bindings::{sapi_globals, zend_string};
 use crate::profiling::{LocalRootSpanResourceMessage, Profiler, VmInterrupt};
 use bindings as zend;
 use bindings::{ZendExtension, ZendResult};
@@ -300,6 +300,15 @@ extern "C" fn minit(r#type: c_int, module_number: c_int) -> ZendResult {
             info!("Memory allocation profiling could not be enabled. Please feel free to fill an issue stating the PHP version and installed modules. Most likely the reason is your PHP binary was compiled with `ZEND_MM_CUSTOM` being disabled.");
         } else {
             info!("Memory allocation profiling enabled.")
+        }
+    }
+
+    #[cfg(feature = "exception_profiling")]
+    {
+        trace!("Exception profiling enabled");
+        unsafe {
+            // TODO: be nice to neighbors
+            zend::zend_throw_exception_hook = Some(datadog_throw_exception_hook);
         }
     }
 
@@ -1002,4 +1011,37 @@ unsafe extern "C" fn alloc_profiling_realloc(
         let prev = PREV_CUSTOM_MM_REALLOC.unwrap();
         prev(ptr, len)
     }
+}
+
+unsafe fn zend_string_to_bytes(zstr: Option<&mut zend_string>) -> &[u8] {
+    bindings::datadog_php_profiling_zend_string_view(zstr).into_bytes()
+}
+
+unsafe extern "C" fn datadog_throw_exception_hook(exception: *mut zend::zend_object) {
+    let exception_name = String::from_utf8_lossy(zend_string_to_bytes((*(*exception).ce).name.as_mut())).to_string();
+    trace!("Exception: {}", exception_name);
+
+    REQUEST_LOCALS.with(|cell| {
+        // Panic: there might already be a mutable reference to `REQUEST_LOCALS`
+        let locals = cell.try_borrow();
+        if locals.is_err() {
+            return;
+        }
+        let locals = locals.unwrap();
+
+        if !locals.profiling_enabled {
+            return;
+        }
+
+        if let Some(profiler) = PROFILER.lock().unwrap().as_ref() {
+            // Safety: execute_data was provided by the engine, and the profiler doesn't mutate it.
+            unsafe {
+                profiler.collect_exceptions(
+                    zend::executor_globals.current_execute_data,
+                    exception_name,
+                    &locals,
+                )
+            };
+        }
+    });
 }
