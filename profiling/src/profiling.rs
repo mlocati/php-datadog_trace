@@ -936,12 +936,10 @@ impl Profiler {
             Ok(frames) => {
                 let depth = frames.len();
 
-                let sample_types = vec![
-                    ValueType {
-                        r#type: Cow::Borrowed("exception-samples"),
-                        unit: Cow::Borrowed("count"),
-                    },
-                ];
+                let sample_types = vec![ValueType {
+                    r#type: Cow::Borrowed("exception-samples"),
+                    unit: Cow::Borrowed("count"),
+                }];
 
                 let sample_values = vec![1];
 
@@ -1015,5 +1013,4 @@ impl Profiler {
             }
         }
     }
-
 }

@@ -962,6 +962,7 @@ unsafe extern "C" fn alloc_profiling_malloc(len: u64) -> *mut ::libc::c_void {
     if zend::executor_globals.current_execute_data.is_null() {
         return ptr;
     }
+    return ptr;
 
     REQUEST_LOCALS.with(|cell| {
         // Panic: there might already be a mutable reference to `REQUEST_LOCALS`
@@ -1018,8 +1019,32 @@ unsafe fn zend_string_to_bytes(zstr: Option<&mut zend_string>) -> &[u8] {
 }
 
 unsafe extern "C" fn datadog_throw_exception_hook(exception: *mut zend::zend_object) {
-    let exception_name = String::from_utf8_lossy(zend_string_to_bytes((*(*exception).ce).name.as_mut())).to_string();
+    let exception_name =
+        String::from_utf8_lossy(zend_string_to_bytes((*(*exception).ce).name.as_mut())).to_string();
+
     trace!("Exception: {}", exception_name);
+
+    let object_store = zend::executor_globals.objects_store;
+    trace!("Object store top is {}", object_store.top);
+
+    let object_buckets = object_store.object_buckets;
+    let mut n = 1;
+    while n < object_store.top {
+        let object = *object_buckets.add(n as usize);
+        if (object as u32 & 1) == 1 {
+            n = n + 1;
+            continue;
+        }
+        let classname =
+            String::from_utf8_lossy(zend_string_to_bytes((*(*object).ce).name.as_mut()))
+                .to_string();
+        trace!(
+            "Found class \"{}\" in object store at index {}",
+            classname,
+            n
+        );
+        n = n + 1;
+    }
 
     REQUEST_LOCALS.with(|cell| {
         // Panic: there might already be a mutable reference to `REQUEST_LOCALS`
