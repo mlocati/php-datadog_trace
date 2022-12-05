@@ -962,6 +962,7 @@ unsafe extern "C" fn alloc_profiling_malloc(len: u64) -> *mut ::libc::c_void {
     if zend::executor_globals.current_execute_data.is_null() {
         return ptr;
     }
+
     return ptr;
 
     REQUEST_LOCALS.with(|cell| {
@@ -1014,10 +1015,12 @@ unsafe extern "C" fn alloc_profiling_realloc(
     }
 }
 
+#[cfg(feature = "allocation_profiling")]
 unsafe fn zend_string_to_bytes(zstr: Option<&mut zend_string>) -> &[u8] {
     bindings::datadog_php_profiling_zend_string_view(zstr).into_bytes()
 }
 
+#[cfg(feature = "allocation_profiling")]
 unsafe extern "C" fn datadog_throw_exception_hook(exception: *mut zend::zend_object) {
     let exception_name =
         String::from_utf8_lossy(zend_string_to_bytes((*(*exception).ce).name.as_mut())).to_string();
