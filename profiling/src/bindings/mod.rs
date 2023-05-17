@@ -10,6 +10,9 @@ use std::sync::atomic::AtomicBool;
 
 pub type VmInterruptFn = unsafe extern "C" fn(execute_data: *mut zend_execute_data);
 
+#[cfg(feature = "io_profiling")]
+pub type VmMmCustomReadFn = unsafe extern "C" fn(*mut _php_stream, *mut i8, u64) -> i64;
+
 #[cfg(feature = "allocation_profiling")]
 pub type VmMmCustomAllocFn = unsafe extern "C" fn(u64) -> *mut libc::c_void;
 #[cfg(feature = "allocation_profiling")]

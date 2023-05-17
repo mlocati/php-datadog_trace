@@ -12,7 +12,7 @@ use config::AgentEndpoint;
 use datadog_profiling::exporter::{Tag, Uri};
 use ddcommon::cstr;
 use lazy_static::lazy_static;
-use libc::c_char;
+use libc::{c_char, rusage};
 use log::{debug, error, info, trace, warn, LevelFilter};
 use once_cell::sync::OnceCell;
 use profiling::{LocalRootSpanResourceMessage, Profiler, VmInterrupt};
@@ -135,6 +135,24 @@ static mut PREV_INTERRUPT_FUNCTION: MaybeUninit<Option<zend::VmInterruptFn>> =
 static mut PREV_EXECUTE_INTERNAL: MaybeUninit<
     unsafe extern "C" fn(execute_data: *mut zend::zend_execute_data, return_value: *mut zend::zval),
 > = MaybeUninit::uninit();
+
+#[cfg(feature = "io_profiling")]
+static mut READ_HANDLER: Option<zend::VmMmCustomReadFn> = None;
+
+#[cfg(feature = "io_profiling")]
+static mut FOPEN_HANDLER: zend::InternalFunctionHandler = None;
+
+#[cfg(feature = "io_profiling")]
+static mut FCLOSE_HANDLER: zend::InternalFunctionHandler = None;
+
+#[cfg(feature = "io_profiling")]
+static mut FREAD_HANDLER: zend::InternalFunctionHandler = None;
+
+#[cfg(feature = "io_profiling")]
+static mut FWRITE_HANDLER: zend::InternalFunctionHandler = None;
+
+#[cfg(feature = "io_profiling")]
+static mut FILE_GET_CONTENTS_HANDLER: zend::InternalFunctionHandler = None;
 
 #[cfg(feature = "allocation_profiling")]
 static mut GC_MEM_CACHES_HANDLER: zend::InternalFunctionHandler = None;
@@ -961,6 +979,44 @@ extern "C" fn startup(extension: *mut ZendExtension) -> ZendResult {
         datadog_php_install_handler(handle);
     }
 
+    #[cfg(feature = "io_profiling")]
+    unsafe {
+        READ_HANDLER = zend::php_stream_stdio_ops.read;
+        zend::php_stream_stdio_ops.read = Some(io_profiling_read);
+
+        let handlers = [
+            datadog_php_zif_handler::new(
+                CStr::from_bytes_with_nul_unchecked(b"fopen\0"),
+                &mut FOPEN_HANDLER,
+                Some(io_profiling_fopen),
+            ),
+            datadog_php_zif_handler::new(
+                CStr::from_bytes_with_nul_unchecked(b"fread\0"),
+                &mut FREAD_HANDLER,
+                Some(io_profiling_fread),
+            ),
+            datadog_php_zif_handler::new(
+                CStr::from_bytes_with_nul_unchecked(b"fwrite\0"),
+                &mut FWRITE_HANDLER,
+                Some(io_profiling_fwrite),
+            ),
+            datadog_php_zif_handler::new(
+                CStr::from_bytes_with_nul_unchecked(b"fclose\0"),
+                &mut FCLOSE_HANDLER,
+                Some(io_profiling_fclose),
+            ),
+            datadog_php_zif_handler::new(
+                CStr::from_bytes_with_nul_unchecked(b"file_get_contents\0"),
+                &mut FILE_GET_CONTENTS_HANDLER,
+                Some(io_profiling_file_get_contents),
+            ),
+        ];
+        for handler in handlers.into_iter() {
+            // Safety: we've set all the parameters correctly for this C call.
+            datadog_php_install_handler(handler);
+        }
+    }
+
     ZendResult::Success
 }
 
@@ -1065,6 +1121,90 @@ extern "C" fn execute_internal(
         prev_execute_internal(execute_data, return_value);
     }
     interrupt_function(execute_data);
+}
+
+fn io_profiler_wrapper(
+    execute_data: *mut zend::zend_execute_data,
+    return_value: *mut zend::zval,
+    func: zend::InternalFunctionHandler,
+) {
+    let mut old_usage: rusage = unsafe { std::mem::zeroed() };
+    let mut usage: rusage = unsafe { std::mem::zeroed() };
+
+    let result = unsafe { libc::getrusage(libc::RUSAGE_SELF, &mut old_usage) };
+    let start = Instant::now();
+
+    if let Some(func) = func {
+        unsafe {
+            func(execute_data, return_value);
+        }
+    }
+
+    let duration = start.elapsed();
+    let result = unsafe { libc::getrusage(libc::RUSAGE_SELF, &mut usage) };
+
+    debug!(
+        "IO took: {} nanoseconds ({} microseconds, {} milliseconds)",
+        duration.as_nanos(),
+        duration.as_micros(),
+        duration.as_millis()
+    );
+
+    debug!("old usage: {old_usage:?}");
+    debug!("usage: {usage:?}");
+}
+
+#[cfg(feature = "io_profiling")]
+unsafe extern "C" fn io_profiling_read(
+    php_stream: *mut zend::_php_stream,
+    buf: *mut i8,
+    len: u64,
+) -> i64 {
+    debug!("IO called with len {}", len);
+    if let Some(func) = READ_HANDLER {
+        return func(php_stream, buf, len);
+    }
+    return 0;
+}
+
+#[cfg(feature = "io_profiling")]
+unsafe extern "C" fn io_profiling_fopen(
+    execute_data: *mut zend::zend_execute_data,
+    return_value: *mut zend::zval,
+) {
+    io_profiler_wrapper(execute_data, return_value, FOPEN_HANDLER);
+}
+
+#[cfg(feature = "io_profiling")]
+unsafe extern "C" fn io_profiling_fclose(
+    execute_data: *mut zend::zend_execute_data,
+    return_value: *mut zend::zval,
+) {
+    io_profiler_wrapper(execute_data, return_value, FCLOSE_HANDLER);
+}
+
+#[cfg(feature = "io_profiling")]
+unsafe extern "C" fn io_profiling_fread(
+    execute_data: *mut zend::zend_execute_data,
+    return_value: *mut zend::zval,
+) {
+    io_profiler_wrapper(execute_data, return_value, FREAD_HANDLER);
+}
+
+#[cfg(feature = "io_profiling")]
+unsafe extern "C" fn io_profiling_fwrite(
+    execute_data: *mut zend::zend_execute_data,
+    return_value: *mut zend::zval,
+) {
+    io_profiler_wrapper(execute_data, return_value, FWRITE_HANDLER);
+}
+
+#[cfg(feature = "io_profiling")]
+unsafe extern "C" fn io_profiling_file_get_contents(
+    execute_data: *mut zend::zend_execute_data,
+    return_value: *mut zend::zval,
+) {
+    io_profiler_wrapper(execute_data, return_value, FILE_GET_CONTENTS_HANDLER);
 }
 
 /// Overrides the ZendMM heap's `use_custom_heap` flag with the default `ZEND_MM_CUSTOM_HEAP_NONE`
