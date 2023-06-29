@@ -131,12 +131,12 @@ ddog_CharSlice ddtrace_get_container_id(void);
 
 void ddtrace_set_container_cgroup_path(ddog_CharSlice path);
 
-bool ddtrace_detect_composer_installed_json(ddog_TelemetryTransport **transport,
+bool ddtrace_detect_composer_installed_json(ddog_SidecarTransport **transport,
                                             const struct ddog_InstanceId *instance_id,
                                             const ddog_QueueId *queue_id,
                                             ddog_CharSlice path);
 
-ddog_MaybeError ddog_sidecar_connect_php(ddog_TelemetryTransport **connection);
+ddog_MaybeError ddog_sidecar_connect_php(ddog_SidecarTransport **connection);
 
 struct ddog_TelemetryActionsBuffer *ddog_sidecar_telemetry_buffer_alloc(void);
 
@@ -150,7 +150,7 @@ void ddog_sidecar_telemetry_enqueueConfig_buffer(struct ddog_TelemetryActionsBuf
                                                  ddog_CharSlice config_value,
                                                  enum ddog_ConfigurationOrigin origin);
 
-ddog_MaybeError ddog_sidecar_telemetry_buffer_flush(ddog_TelemetryTransport **transport,
+ddog_MaybeError ddog_sidecar_telemetry_buffer_flush(ddog_SidecarTransport **transport,
                                                     const struct ddog_InstanceId *instance_id,
                                                     const ddog_QueueId *queue_id,
                                                     struct ddog_TelemetryActionsBuffer *buffer);
