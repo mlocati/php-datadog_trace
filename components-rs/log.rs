@@ -1,10 +1,10 @@
+use bitflags::bitflags;
+use ddcommon_ffi::slice::AsBytes;
+use ddcommon_ffi::CharSlice;
 use std::cell::RefCell;
 use std::collections::BTreeSet;
 use std::ffi::c_char;
 use std::slice;
-use bitflags::bitflags;
-use ddcommon_ffi::CharSlice;
-use ddcommon_ffi::slice::AsBytes;
 
 bitflags! {
     #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
@@ -22,7 +22,11 @@ bitflags! {
 
 #[macro_export]
 macro_rules! log {
-    ($source:ident, $msg:expr) => { if ($crate::ddog_shall_log($crate::Log::$source)) { $crate::log($crate::Log::$source, $msg) } }
+    ($source:ident, $msg:expr) => {
+        if ($crate::ddog_shall_log($crate::Log::$source)) {
+            $crate::log($crate::Log::$source, $msg)
+        }
+    };
 }
 
 #[allow_internal_unstable(thread_local)]
@@ -48,17 +52,26 @@ pub extern "C" fn ddog_shall_log(level: Log) -> bool {
     unsafe { LOG_CATEGORY }.contains(level & !Log::Once)
 }
 
-pub fn log<S>(level: Log, msg: S) where S: AsRef<str> {
+pub fn log<S>(level: Log, msg: S)
+where
+    S: AsRef<str>,
+{
     ddog_log(level, CharSlice::from(msg.as_ref()))
 }
 
 #[no_mangle]
 pub extern "C" fn ddog_set_log_category(level: Log) {
-    unsafe { LOG_CATEGORY = level; }
+    unsafe {
+        LOG_CATEGORY = level;
+    }
 }
 
 #[no_mangle]
-pub unsafe extern "C" fn ddog_parse_log_category(category_names: *const CharSlice, num: usize, startup_logs_by_default: bool) {
+pub unsafe extern "C" fn ddog_parse_log_category(
+    category_names: *const CharSlice,
+    num: usize,
+    startup_logs_by_default: bool,
+) {
     let mut categories = Log::None;
     let category_names = slice::from_raw_parts(category_names, num);
 

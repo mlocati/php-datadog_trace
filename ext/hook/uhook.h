@@ -5,6 +5,7 @@
 #include <sandbox/sandbox.h>
 
 HashTable *dd_uhook_collect_args(zend_execute_data *execute_data);
+bool ddtrace_uhook_match_filepath(zend_string *file, zend_string *source);
 void dd_uhook_report_sandbox_error(zend_execute_data *execute_data, zend_object *closure);
 
 void zai_uhook_rinit();

@@ -115,9 +115,17 @@ typedef enum ddog_ConfigurationOrigin {
   DDOG_CONFIGURATION_ORIGIN_DEFAULT,
 } ddog_ConfigurationOrigin;
 
+typedef enum ddog_InBodyLocation {
+  DDOG_IN_BODY_LOCATION_NONE,
+  DDOG_IN_BODY_LOCATION_START,
+  DDOG_IN_BODY_LOCATION_END,
+} ddog_InBodyLocation;
+
 typedef struct ddog_BlockingTransport_SidecarInterfaceResponse__SidecarInterfaceRequest ddog_BlockingTransport_SidecarInterfaceResponse__SidecarInterfaceRequest;
 
 typedef struct ddog_InstanceId ddog_InstanceId;
+
+typedef struct ddog_RemoteConfigState ddog_RemoteConfigState;
 
 typedef struct ddog_TelemetryActionsBuffer ddog_TelemetryActionsBuffer;
 
@@ -141,6 +149,218 @@ typedef struct ddog_Option_VecU8 {
 } ddog_Option_VecU8;
 
 typedef struct ddog_Option_VecU8 ddog_MaybeError;
+
+typedef enum ddog_IntermediateValue_Tag {
+  DDOG_INTERMEDIATE_VALUE_STRING,
+  DDOG_INTERMEDIATE_VALUE_NUMBER,
+  DDOG_INTERMEDIATE_VALUE_BOOL,
+  DDOG_INTERMEDIATE_VALUE_NULL,
+  DDOG_INTERMEDIATE_VALUE_REFERENCED,
+} ddog_IntermediateValue_Tag;
+
+typedef struct ddog_IntermediateValue {
+  ddog_IntermediateValue_Tag tag;
+  union {
+    struct {
+      ddog_CharSlice string;
+    };
+    struct {
+      double number;
+    };
+    struct {
+      bool bool_;
+    };
+    struct {
+      const void *referenced;
+    };
+  };
+} ddog_IntermediateValue;
+
+typedef struct ddog_VoidCollection {
+  intptr_t count;
+  const void *elements;
+  void (*free)(struct ddog_VoidCollection);
+} ddog_VoidCollection;
+
+typedef struct ddog_Evaluator {
+  bool (*equals)(const void*, struct ddog_IntermediateValue, struct ddog_IntermediateValue);
+  bool (*greater_than)(const void*, struct ddog_IntermediateValue, struct ddog_IntermediateValue);
+  bool (*greater_or_equals)(const void*,
+                            struct ddog_IntermediateValue,
+                            struct ddog_IntermediateValue);
+  const void *(*fetch_identifier)(const void*, const ddog_CharSlice*);
+  const void *(*fetch_index)(const void*, const void*, struct ddog_IntermediateValue);
+  const void *(*fetch_nested)(const void*, const void*, struct ddog_IntermediateValue);
+  uint64_t (*length)(const void*, const void*);
+  struct ddog_VoidCollection (*try_enumerate)(const void*, const void*);
+  struct ddog_VoidCollection (*stringify)(const void*, const void*);
+  intptr_t (*convert_index)(const void*, const void*);
+} ddog_Evaluator;
+
+typedef enum ddog_Option_CharSlice_Tag {
+  DDOG_OPTION_CHAR_SLICE_SOME_CHAR_SLICE,
+  DDOG_OPTION_CHAR_SLICE_NONE_CHAR_SLICE,
+} ddog_Option_CharSlice_Tag;
+
+typedef struct ddog_Option_CharSlice {
+  ddog_Option_CharSlice_Tag tag;
+  union {
+    struct {
+      ddog_CharSlice some;
+    };
+  };
+} ddog_Option_CharSlice;
+
+typedef struct ddog_CharSliceVec {
+  const ddog_CharSlice *strings;
+  uintptr_t string_count;
+} ddog_CharSliceVec;
+
+typedef struct ddog_ProbeTarget {
+  struct ddog_Option_CharSlice type_name;
+  struct ddog_Option_CharSlice method_name;
+  struct ddog_Option_CharSlice source_file;
+  struct ddog_Option_CharSlice signature;
+  struct ddog_CharSliceVec lines;
+  enum ddog_InBodyLocation in_body_location;
+} ddog_ProbeTarget;
+
+typedef struct ddog_LiveDebuggerCallbacks {
+  int64_t (*set_span_probe)(const struct ddog_ProbeTarget *target);
+  void (*remove_span_probe)(int64_t id);
+} ddog_LiveDebuggerCallbacks;
+
+typedef struct ddog_LiveDebuggerSetup {
+  const struct ddog_Evaluator *evaluator;
+  struct ddog_LiveDebuggerCallbacks callbacks;
+} ddog_LiveDebuggerSetup;
+
+typedef enum ddog_EvaluateAt {
+  DDOG_EVALUATE_AT_ENTRY,
+  DDOG_EVALUATE_AT_EXIT,
+} ddog_EvaluateAt;
+
+typedef enum ddog_MetricKind {
+  DDOG_METRIC_KIND_COUNT,
+  DDOG_METRIC_KIND_GAUGE,
+  DDOG_METRIC_KIND_HISTOGRAM,
+  DDOG_METRIC_KIND_DISTRIBUTION,
+} ddog_MetricKind;
+
+typedef enum ddog_SpanProbeTarget {
+  DDOG_SPAN_PROBE_TARGET_ACTIVE,
+  DDOG_SPAN_PROBE_TARGET_ROOT,
+} ddog_SpanProbeTarget;
+
+typedef struct ddog_DslString ddog_DslString;
+
+typedef struct ddog_ProbeCondition ddog_ProbeCondition;
+
+typedef struct ddog_ProbeValue ddog_ProbeValue;
+
+typedef struct ddog_MetricProbe {
+  enum ddog_MetricKind kind;
+  ddog_CharSlice name;
+  const struct ddog_ProbeValue *value;
+} ddog_MetricProbe;
+
+typedef struct ddog_Capture {
+  uint32_t max_reference_depth;
+  uint32_t max_collection_size;
+  uint32_t max_length;
+  uint32_t max_field_depth;
+} ddog_Capture;
+
+typedef struct ddog_LogProbe {
+  const struct ddog_DslString *segments;
+  const struct ddog_ProbeCondition *when;
+  const struct ddog_Capture *capture;
+  uint32_t sampling_snapshots_per_second;
+} ddog_LogProbe;
+
+typedef struct ddog_Tag {
+  ddog_CharSlice name;
+  const struct ddog_DslString *value;
+} ddog_Tag;
+
+typedef struct ddog_SpanProbeDecoration {
+  const struct ddog_ProbeCondition *condition;
+  const struct ddog_Tag *tags;
+  uintptr_t tags_count;
+} ddog_SpanProbeDecoration;
+
+typedef struct ddog_SpanDecorationProbe {
+  enum ddog_SpanProbeTarget target;
+  const struct ddog_SpanProbeDecoration *decorations;
+  uintptr_t decorations_count;
+} ddog_SpanDecorationProbe;
+
+typedef enum ddog_ProbeType_Tag {
+  DDOG_PROBE_TYPE_METRIC,
+  DDOG_PROBE_TYPE_LOG,
+  DDOG_PROBE_TYPE_SPAN,
+  DDOG_PROBE_TYPE_SPAN_DECORATION,
+} ddog_ProbeType_Tag;
+
+typedef struct ddog_ProbeType {
+  ddog_ProbeType_Tag tag;
+  union {
+    struct {
+      struct ddog_MetricProbe metric;
+    };
+    struct {
+      struct ddog_LogProbe log;
+    };
+    struct {
+      struct ddog_SpanDecorationProbe span_decoration;
+    };
+  };
+} ddog_ProbeType;
+
+typedef struct ddog_Probe {
+  ddog_CharSlice id;
+  uint64_t version;
+  struct ddog_Option_CharSlice language;
+  struct ddog_CharSliceVec tags;
+  struct ddog_ProbeTarget target;
+  enum ddog_EvaluateAt evaluate_at;
+  struct ddog_ProbeType probe;
+} ddog_Probe;
+
+typedef struct ddog_FilterList {
+  struct ddog_CharSliceVec package_prefixes;
+  struct ddog_CharSliceVec classes;
+} ddog_FilterList;
+
+typedef struct ddog_ServiceConfiguration {
+  ddog_CharSlice id;
+  struct ddog_FilterList allow;
+  struct ddog_FilterList deny;
+  uint32_t sampling_snapshots_per_second;
+} ddog_ServiceConfiguration;
+
+typedef enum ddog_LiveDebuggingData_Tag {
+  DDOG_LIVE_DEBUGGING_DATA_NONE,
+  DDOG_LIVE_DEBUGGING_DATA_PROBE,
+  DDOG_LIVE_DEBUGGING_DATA_SERVICE_CONFIGURATION,
+} ddog_LiveDebuggingData_Tag;
+
+typedef struct ddog_LiveDebuggingData {
+  ddog_LiveDebuggingData_Tag tag;
+  union {
+    struct {
+      struct ddog_Probe probe;
+    };
+    struct {
+      struct ddog_ServiceConfiguration service_configuration;
+    };
+  };
+} ddog_LiveDebuggingData;
+
+typedef struct ddog_LiveDebuggingParseResult {
+  struct ddog_LiveDebuggingData data;
+  struct ddog_LiveDebuggingData *opaque_data;
+} ddog_LiveDebuggingParseResult;
 
 typedef enum ddog_LogLevel {
   DDOG_LOG_LEVEL_ERROR,
@@ -177,6 +397,8 @@ typedef struct ddog_MappedMem_ShmHandle ddog_MappedMem_ShmHandle;
  * allowing safe transfer and sharing of file handles across processes, and threads
  */
 typedef struct ddog_PlatformHandle_File ddog_PlatformHandle_File;
+
+typedef struct ddog_RemoteConfigReader ddog_RemoteConfigReader;
 
 typedef struct ddog_RuntimeMeta ddog_RuntimeMeta;
 

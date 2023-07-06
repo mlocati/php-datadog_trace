@@ -28,9 +28,13 @@ static void dd_handle_fork(zval *return_value) {
             ddtrace_coms_curl_shutdown();
             ddtrace_coms_clean_background_sender_after_fork();
         }
-        if (DDTRACE_G(remote_config_reader)) {
-            ddog_agent_remote_config_reader_drop(DDTRACE_G(remote_config_reader));
-            DDTRACE_G(remote_config_reader) = NULL;
+        if (DDTRACE_G(agent_config_reader)) {
+            ddog_agent_remote_config_reader_drop(DDTRACE_G(agent_config_reader));
+            DDTRACE_G(agent_config_reader) = NULL;
+        }
+        if (DDTRACE_G(remote_config_state)) {
+            ddog_shutdown_remote_config(DDTRACE_G(remote_config_state));
+            DDTRACE_G(remote_config_state) = NULL;
         }
         ddtrace_seed_prng();
         ddtrace_generate_runtime_id();
@@ -54,7 +58,7 @@ static void dd_handle_fork(zval *return_value) {
         }
         if (!get_global_DD_TRACE_SIDECAR_TRACE_SENDER()) {
             ddtrace_coms_init_and_start_writer();
-            ddog_agent_remote_config_reader_for_anon_shm(ddtrace_coms_agent_config_handle, &DDTRACE_G(remote_config_reader));
+            ddog_agent_remote_config_reader_for_anon_shm(ddtrace_coms_agent_config_handle, &DDTRACE_G(agent_config_reader));
         }
     }
 }

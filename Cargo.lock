@@ -703,6 +703,22 @@ dependencies = [
 ]
 
 [[package]]
+name = "datadog-live-debugger"
+version = "0.0.1"
+dependencies = [
+ "json",
+ "regex",
+]
+
+[[package]]
+name = "datadog-live-debugger-ffi"
+version = "0.0.1"
+dependencies = [
+ "datadog-live-debugger",
+ "ddcommon-ffi",
+]
+
+[[package]]
 name = "datadog-php-profiling"
 version = "0.90.0"
 dependencies = [
@@ -764,14 +780,23 @@ dependencies = [
 ]
 
 [[package]]
+name = "datadog-remote-config"
+version = "0.0.1"
+dependencies = [
+ "datadog-live-debugger",
+]
+
+[[package]]
 name = "datadog-sidecar"
 version = "0.0.1"
 dependencies = [
  "anyhow",
+ "base64 0.21.2",
  "bytes",
  "console-subscriber",
  "datadog-ipc",
  "datadog-ipc-macros",
+ "datadog-remote-config",
  "datadog-sidecar-macros",
  "datadog-trace-normalization",
  "datadog-trace-protobuf",
@@ -971,6 +996,9 @@ dependencies = [
  "bitflags 2.3.3",
  "cbindgen",
  "cc_utils",
+ "datadog-live-debugger",
+ "datadog-live-debugger-ffi",
+ "datadog-remote-config",
  "datadog-sidecar",
  "datadog-sidecar-ffi",
  "ddcommon 3.0.0",
