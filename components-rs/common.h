@@ -167,6 +167,8 @@ typedef struct ddog_AgentRemoteConfigReader ddog_AgentRemoteConfigReader;
 
 typedef struct ddog_AgentRemoteConfigWriter_ShmHandle ddog_AgentRemoteConfigWriter_ShmHandle;
 
+typedef struct ddog_MappedMem_ShmHandle ddog_MappedMem_ShmHandle;
+
 /**
  * PlatformHandle contains a valid reference counted FileDescriptor and associated Type information
  * allowing safe transfer and sharing of file handles across processes, and threads

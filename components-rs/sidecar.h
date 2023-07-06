@@ -29,6 +29,13 @@ void ddog_ph_file_drop(struct ddog_NativeFile ph);
 
 ddog_MaybeError ddog_alloc_anon_shm_handle(uintptr_t size, struct ddog_ShmHandle **handle);
 
+ddog_MaybeError ddog_map_shm(struct ddog_ShmHandle *handle,
+                             struct ddog_MappedMem_ShmHandle **mapped,
+                             void **pointer,
+                             uintptr_t *size);
+
+struct ddog_ShmHandle *ddog_unmap_shm(struct ddog_MappedMem_ShmHandle *mapped);
+
 void ddog_drop_anon_shm_handle(struct ddog_ShmHandle*);
 
 ddog_MaybeError ddog_create_agent_remote_config_writer(struct ddog_AgentRemoteConfigWriter_ShmHandle **writer,
@@ -106,10 +113,12 @@ ddog_MaybeError ddog_sidecar_telemetry_end(ddog_SidecarTransport **transport,
 
 bool ddog_sidecar_is_closed(ddog_SidecarTransport **transport);
 
-ddog_MaybeError ddog_sidecar_session_config_setEndpoint(ddog_SidecarTransport **transport,
-                                                        ddog_CharSlice session_id,
-                                                        const struct ddog_Endpoint *endpoint,
-                                                        uint64_t flush_interval_milliseconds);
+ddog_MaybeError ddog_sidecar_session_set_config(ddog_SidecarTransport **transport,
+                                                ddog_CharSlice session_id,
+                                                const struct ddog_Endpoint *endpoint,
+                                                uint64_t flush_interval_milliseconds,
+                                                uintptr_t force_flush_size,
+                                                uintptr_t force_drop_size);
 
 ddog_MaybeError ddog_sidecar_send_trace_v04_shm(ddog_SidecarTransport **transport,
                                                 const struct ddog_InstanceId *instance_id,
