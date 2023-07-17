@@ -548,9 +548,6 @@ extern "C" fn rinit(r#type: c_int, module_number: c_int) -> ZendResult {
         });
     }
 
-    #[cfg(feature = "allocation_profiling")]
-    allocation::allocation_profiling_rinit();
-
     ZendResult::Success
 }
 
@@ -647,9 +644,6 @@ extern "C" fn rshutdown(r#type: c_int, module_number: c_int) -> ZendResult {
             locals.tags = Arc::new(static_tags());
         }
     });
-
-    #[cfg(feature = "allocation_profiling")]
-    allocation::allocation_profiling_rshutdown();
 
     ZendResult::Success
 }
@@ -836,9 +830,6 @@ extern "C" fn startup(extension: *mut ZendExtension) -> ZendResult {
 
     // Safety: calling this in zend_extension startup.
     unsafe { pcntl::startup() };
-
-    #[cfg(feature = "allocation_profiling")]
-    allocation::allocation_profiling_startup();
 
     ZendResult::Success
 }
