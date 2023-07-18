@@ -548,6 +548,9 @@ extern "C" fn rinit(r#type: c_int, module_number: c_int) -> ZendResult {
         });
     }
 
+    #[cfg(feature = "allocation_profiling")]
+    allocation::allocation_profiling_rinit();
+
     ZendResult::Success
 }
 
