@@ -9,23 +9,7 @@ use rand_distr::{Distribution, Poisson};
 
 static JIT_ENABLED: OnceCell<bool> = OnceCell::new();
 thread_local! {
-    static OBSERVER: RefCell<*mut zend::zend_mm_observer_node> = RefCell::new(std::ptr::null_mut());
-}
-
-pub unsafe extern "C" fn ddog_alloc_profiling_register_destruct(
-    ctx: *mut zend::zend_mm_observer_ctx,
-) {
-    let _ = Box::from_raw(ctx);
-}
-
-pub extern "C" fn ddog_allocation_profiling_register_observer() -> *mut zend::zend_mm_observer_ctx {
-    let context = Box::new(zend::zend_mm_observer_ctx {
-        malloc: Some(alloc_profiling_malloc),
-        free: None,
-        realloc: Some(alloc_profiling_realloc),
-        destruct: Some(ddog_alloc_profiling_register_destruct),
-    });
-    Box::into_raw(context)
+    static OBSERVER: RefCell<*mut zend::zend_mm_observer> = RefCell::new(std::ptr::null_mut());
 }
 
 pub fn allocation_profiling_minit() {
@@ -34,8 +18,12 @@ pub fn allocation_profiling_minit() {
     }
     OBSERVER.with(|observer| {
         *observer.borrow_mut() = unsafe {
-            zend::zend_mm_observer_register(Some(ddog_allocation_profiling_register_observer))
-        }
+            zend::zend_mm_observer_register(
+                Some(alloc_profiling_malloc),
+                None,
+                Some(alloc_profiling_realloc),
+            )
+        };
     });
 }
 
@@ -140,11 +128,7 @@ thread_local! {
     static ALLOCATION_PROFILING_STATS: RefCell<AllocationProfilingStats> = RefCell::new(AllocationProfilingStats::new());
 }
 
-unsafe extern "C" fn alloc_profiling_malloc(
-    _ctx: *mut zend::zend_mm_observer_ctx,
-    len: size_t,
-    _ptr: *mut c_void,
-) {
+unsafe extern "C" fn alloc_profiling_malloc(len: size_t, _ptr: *mut c_void) {
     // during startup, minit, rinit, ... current_execute_data is null
     // we are only interested in allocations during userland operations
     if zend::ddog_php_prof_get_current_execute_data().is_null() {
@@ -157,12 +141,7 @@ unsafe extern "C" fn alloc_profiling_malloc(
     });
 }
 
-unsafe extern "C" fn alloc_profiling_realloc(
-    _ctx: *mut zend::zend_mm_observer_ctx,
-    prev_ptr: *mut c_void,
-    len: size_t,
-    ptr: *mut c_void,
-) {
+unsafe extern "C" fn alloc_profiling_realloc(prev_ptr: *mut c_void, len: size_t, ptr: *mut c_void) {
     // during startup, minit, rinit, ... current_execute_data is null
     // we are only interested in allocations during userland operations
     if zend::ddog_php_prof_get_current_execute_data().is_null() || ptr == prev_ptr {
