@@ -648,6 +648,9 @@ extern "C" fn rshutdown(r#type: c_int, module_number: c_int) -> ZendResult {
         }
     });
 
+    #[cfg(feature = "allocation_profiling")]
+    allocation::allocation_profiling_rshutdown();
+
     ZendResult::Success
 }
 
