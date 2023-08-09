@@ -304,6 +304,9 @@ extern "C" fn minit(r#type: c_int, module_number: c_int) -> ZendResult {
     #[cfg(feature = "timeline")]
     timeline::timeline_minit();
 
+    #[cfg(feature = "exception_profiling")]
+    exception::exception_profiling_minit();
+
     ZendResult::Success
 }
 
@@ -681,9 +684,6 @@ extern "C" fn rshutdown(r#type: c_int, module_number: c_int) -> ZendResult {
     #[cfg(feature = "allocation_profiling")]
     allocation::allocation_profiling_rshutdown();
 
-    #[cfg(feature = "exception_profiling")]
-    exception::exception_profiling_rshutdown();
-
     ZendResult::Success
 }
 
@@ -856,6 +856,9 @@ extern "C" fn mshutdown(r#type: c_int, module_number: c_int) -> ZendResult {
     if let Some(profiler) = profiler.as_mut() {
         profiler.stop(Duration::from_secs(1));
     }
+
+    #[cfg(feature = "exception_profiling")]
+    exception::exception_profiling_mshutdown();
 
     ZendResult::Success
 }
