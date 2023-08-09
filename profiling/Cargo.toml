@@ -6,7 +6,7 @@ license = "Apache-2.0"
 rust-version = "1.64"
 
 [lib]
-crate-type = ["cdylib"]
+crate-type = ["cdylib", "rlib"]
 bench = false # disables cargo build in libtest bench
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
@@ -18,6 +18,10 @@ bumpalo = { version = "3.12", features = ["collections"] }
 cfg-if = { version = "1.0" }
 cpu-time = { version = "1.0" }
 crossbeam-channel = { version = "0.5", default-features = false, features = ["std"] }
+# datadog-profiling = { git = "https://github.com/DataDog/libdatadog", branch = "dsn/sample_map" }
+# ddcommon = { git = "https://github.com/DataDog/libdatadog", branch = "dsn/sample_map" }
+# datadog-profiling = { git = "https://github.com/DataDog/libdatadog", branch = "dsn/sample_vec" }
+# ddcommon = { git = "https://github.com/DataDog/libdatadog", branch = "dsn/sample_vec" }
 datadog-profiling = { git = "https://github.com/DataDog/libdatadog", tag = "v2.2.0" }
 ddcommon = { git = "https://github.com/DataDog/libdatadog", tag = "v2.2.0" }
 env_logger = { version = "0.10" }
@@ -33,14 +37,15 @@ rand_distr = { version = "0.4.3" }
 uuid = { version = "1.0", features = ["v4"] }
 
 [dev-dependencies]
-criterion = { version = "0.4" }
+criterion = { version = "0.5", features = ["html_reports"] }
+memory-stats = "1"
 
 [target.'cfg(target_arch = "x86_64")'.dev-dependencies]
 criterion-perf-events = "0.3"
 perfcnt = "0.8.0"
 
 [[bench]]
-name = "stack_walking"
+name = "bench_main"
 harness = false
 
 [features]

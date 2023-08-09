@@ -9,7 +9,7 @@ use perfcnt::linux::HardwareEventType as Hardware;
 #[cfg(all(target_arch = "x86_64", target_os = "linux"))]
 use perfcnt::linux::PerfCounterBuilderLinux as Builder;
 
-fn benchmark(c: &mut Criterion) {
+fn run_stack_walking(c: &mut Criterion) {
     let mut group = c.benchmark_group("walk_stack");
     group.sampling_mode(SamplingMode::Flat);
     for depth in [1, 50, 99].iter() {
@@ -37,9 +37,9 @@ fn benchmark_instructions(c: &mut Criterion<Perf>) {
 }
 
 criterion_group!(
-    name = benches;
+    name = stack_walking;
     config = Criterion::default();
-    targets = benchmark
+    targets = run_stack_walking
 );
 
 #[cfg(all(target_arch = "x86_64", target_os = "linux"))]
@@ -48,9 +48,3 @@ criterion_group!(
     config = Criterion::default().with_measurement(Perf::new(Builder::from_hardware_event(Hardware::Instructions)));
     targets = benchmark_instructions
 );
-
-#[cfg(all(target_arch = "x86_64", target_os = "linux"))]
-criterion_main!(benches, instructions_bench);
-
-#[cfg(not(all(target_arch = "x86_64", target_os = "linux")))]
-criterion_main!(benches);

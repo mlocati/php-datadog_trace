@@ -620,7 +620,7 @@ dependencies = [
  "cc",
  "cfg-if",
  "cpu-time",
- "criterion 0.4.0",
+ "criterion 0.5.1",
  "criterion-perf-events",
  "crossbeam-channel",
  "datadog-profiling",
@@ -630,6 +630,7 @@ dependencies = [
  "lazy_static",
  "libc 0.2.147",
  "log",
+ "memory-stats",
  "once_cell",
  "ouroboros",
  "perfcnt",
@@ -1470,6 +1471,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "memory-stats"
+version = "1.1.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "34f79cf9964c5c9545493acda1263f1912f8d2c56c8a2ffee2606cb960acaacc"
+dependencies = [
+ "libc 0.2.147",
+ "winapi",
+]
+
+[[package]]
 name = "mime"
 version = "0.3.17"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1896,7 +1907,7 @@ version = "1.0.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "059a34f111a9dee2ce1ac2826a68b24601c4298cfeb1a587c3cb493d5ab46f52"
 dependencies = [
- "libc 0.1.12",
+ "libc 0.2.147",
  "nix",
 ]
 

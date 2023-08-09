@@ -50,13 +50,13 @@ const UPLOAD_CHANNEL_CAPACITY: usize = 8;
 ///  2. On by default types.
 ///  3. Off by default types.
 #[derive(Default)]
-struct SampleValues {
-    interrupt_count: i64,
-    wall_time: i64,
-    cpu_time: i64,
-    alloc_samples: i64,
-    alloc_size: i64,
-    timeline: i64,
+pub struct SampleValues {
+    pub interrupt_count: i64,
+    pub wall_time: i64,
+    pub cpu_time: i64,
+    pub alloc_samples: i64,
+    pub alloc_size: i64,
+    pub timeline: i64,
 }
 
 const WALL_TIME_PERIOD: Duration = Duration::from_millis(10);
@@ -66,13 +66,13 @@ const WALL_TIME_PERIOD_TYPE: ValueType = ValueType {
 };
 
 #[derive(Debug, Clone)]
-struct WallTime {
+pub struct WallTime {
     instant: Instant,
     systemtime: SystemTime,
 }
 
 impl WallTime {
-    fn now() -> Self {
+    pub fn now() -> Self {
         Self {
             instant: Instant::now(),
             systemtime: SystemTime::now(),
@@ -196,7 +196,7 @@ pub struct Profiler {
     should_join: AtomicBool,
 }
 
-struct TimeCollector {
+pub struct TimeCollector {
     fork_barrier: Arc<Barrier>,
     interrupt_manager: Arc<InterruptManager>,
     message_receiver: Receiver<ProfilerMessage>,
@@ -310,7 +310,7 @@ impl TimeCollector {
         }
     }
 
-    fn handle_sample_message(
+    pub fn handle_sample_message(
         message: SampleMessage,
         profiles: &mut HashMap<ProfileIndex, profile::Profile>,
         started_at: &WallTime,
@@ -895,6 +895,16 @@ impl Profiler {
         vec![]
     }
 
+    pub fn bench_preapre_sample_message(
+        frames: Vec<ZendFrame>,
+        samples: SampleValues,
+        #[cfg(php_has_fibers)] mut labels: Vec<Label>,
+        #[cfg(not(php_has_fibers))] labels: Vec<Label>,
+        locals: &RequestLocals,
+    ) -> SampleMessage {
+        Profiler::prepare_sample_message(frames, samples, labels, locals)
+    }
+
     fn prepare_sample_message(
         frames: Vec<ZendFrame>,
         samples: SampleValues,
@@ -942,20 +952,20 @@ impl Profiler {
                 sample_values.push(values[5]);
             }
 
-            #[cfg(php_has_fibers)]
-            if let Some(fiber) = unsafe { ddog_php_prof_get_active_fiber().as_mut() } {
-                // Safety: the fcc is set by Fiber::__construct as part of zpp,
-                // which will always set the function_handler on success, and
-                // there's nothing changing that value in all of fibers
-                // afterwards, from start to destruction of the fiber itself.
-                let func = unsafe { &*fiber.fci_cache.function_handler };
-                if let Some(functionname) = unsafe { extract_function_name(func) } {
-                    labels.push(Label {
-                        key: "fiber",
-                        value: LabelValue::Str(functionname.into()),
-                    });
-                }
-            }
+            // #[cfg(php_has_fibers)]
+            // if let Some(fiber) = unsafe { ddog_php_prof_get_active_fiber().as_mut() } {
+            //     // Safety: the fcc is set by Fiber::__construct as part of zpp,
+            //     // which will always set the function_handler on success, and
+            //     // there's nothing changing that value in all of fibers
+            //     // afterwards, from start to destruction of the fiber itself.
+            //     let func = unsafe { &*fiber.fci_cache.function_handler };
+            //     if let Some(functionname) = unsafe { extract_function_name(func) } {
+            //         labels.push(Label {
+            //             key: "fiber",
+            //             value: LabelValue::Str(functionname.into()),
+            //         });
+            //     }
+            // }
         }
 
         let tags = TAGS.with(|cell| Arc::clone(&cell.borrow()));

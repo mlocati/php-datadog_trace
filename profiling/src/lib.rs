@@ -1,7 +1,7 @@
 pub mod bindings;
 pub mod capi;
 mod clocks;
-mod config;
+pub mod config;
 mod logging;
 mod pcntl;
 pub mod profiling;
@@ -41,7 +41,7 @@ use uuid::Uuid;
 
 /// The global profiler. Profiler gets made during the first rinit after an
 /// minit, and is destroyed on mshutdown.
-static PROFILER: Mutex<Option<Profiler>> = Mutex::new(None);
+pub static PROFILER: Mutex<Option<Profiler>> = Mutex::new(None);
 
 /// Name of the profiling module and zend_extension. Must not contain any
 /// interior null bytes and must be null terminated.
@@ -337,7 +337,7 @@ thread_local! {
         wall_time: Instant::now(),
     });
 
-    static REQUEST_LOCALS: RefCell<RequestLocals> = RefCell::new(RequestLocals {
+    pub static REQUEST_LOCALS: RefCell<RequestLocals> = RefCell::new(RequestLocals {
         env: None,
         interrupt_count: AtomicU32::new(0),
         profiling_enabled: false,
