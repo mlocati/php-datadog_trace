@@ -714,12 +714,10 @@ unsafe extern "C" fn minfo(module_ptr: *mut zend::ModuleEntry) {
             b"Experimental CPU Time Profiling Enabled\0".as_ptr(),
             if locals.profiling_experimental_cpu_time_enabled {
                 yes
+            } else if locals.profiling_enabled {
+                no
             } else {
-                if locals.profiling_enabled {
-                    no
-                } else {
-                    no_all
-                }
+                no_all
             },
         );
 
@@ -732,12 +730,10 @@ unsafe extern "C" fn minfo(module_ptr: *mut zend::ModuleEntry) {
                         yes
                     } else if zend::ddog_php_jit_enabled() {
                         b"Not available due to JIT being active, see https://github.com/DataDog/dd-trace-php/pull/2088 for more information.\0"
+                    } else if locals.profiling_enabled {
+                        no
                     } else {
-                        if locals.profiling_enabled {
-                            no
-                        } else {
-                            no_all
-                        }
+                        no_all
                     }
                 );
             } else {
@@ -756,12 +752,10 @@ unsafe extern "C" fn minfo(module_ptr: *mut zend::ModuleEntry) {
                     b"Experimental Timeline Enabled\0".as_ptr(),
                     if locals.profiling_experimental_timeline_enabled {
                         yes
+                    } else if locals.profiling_enabled {
+                        no
                     } else {
-                        if locals.profiling_enabled {
-                            no
-                        } else {
-                            no_all
-                        }
+                        no_all
                     },
                 );
             } else {
@@ -802,12 +796,10 @@ unsafe extern "C" fn minfo(module_ptr: *mut zend::ModuleEntry) {
             b"Endpoint Collection Enabled\0".as_ptr(),
             if locals.profiling_endpoint_collection_enabled {
                 yes
+            } else if locals.profiling_enabled {
+                no
             } else {
-                if locals.profiling_enabled {
-                    no
-                } else {
-                    no_all
-                }
+                no_all
             },
         );
 
