@@ -186,9 +186,9 @@ class WordPressIntegrationLoader
 
     public static function setSpansLimit()
     {
-        // Safety measure - Adds 10 spans / plugin (arbitrary)
+        // Safety measure - Adds 25 spans / plugin (arbitrary)
         $pluginCount = count(wp_get_active_and_valid_plugins());
-        $spansLimit = 1000 + ($pluginCount * 10);
+        $spansLimit = 1000 + ($pluginCount * 25);
 
         $currentLimit = ini_get('datadog.trace.spans_limit');
         $spansLimit = max($spansLimit, $currentLimit);
@@ -258,9 +258,7 @@ class WordPressIntegrationLoader
         });
 
         hook_function('wp', function () use ($integration) {
-            if (dd_trace_env_config('DD_TRACE_WORDPRESS_CALLBACKS')) {
-                WordPressIntegrationLoader::setSpansLimit();
-            }
+            WordPressIntegrationLoader::setSpansLimit();
 
             // Runs after wp-settings.php is loaded - i.e., after the entire core of WordPress functions is
             // loaded and the current user is populated
@@ -678,7 +676,7 @@ class WordPressIntegrationLoader
                 $action = $args[0];
                 $callback = $args[1];
                 $pluginName = end($plugins);
-                if (isset($interestingActions[$action]) && dd_trace_env_config('DD_TRACE_WORDPRESS_CALLBACKS')) {
+                if (isset($interestingActions[$action])) {
                     install_hook(
                         (
                         is_array($callback) && is_string($callback[0])
