@@ -86,6 +86,11 @@ if test "$PHP_DDTRACE" != "no"; then
 
     EXTRA_PHP_SOURCES="ext/handlers_curl_php7.c"
 
+    if test $PHP_VERSION_ID -lt 70300; then
+      EXTRA_PHP_SOURCES="$EXTRA_PHP_SOURCES \
+        ext/zend_hrtime.c"
+    fi
+
     EXTRA_ZAI_SOURCES="\
       zend_abstract_interface/interceptor/php7/interceptor.c \
       zend_abstract_interface/interceptor/php7/resolver.c \
@@ -278,7 +283,7 @@ if test "$PHP_DDTRACE" != "no"; then
 
   cat <<EOT >> Makefile.fragments
 \$(builddir)/target/$ddtrace_cargo_profile/libddtrace_php.a: $( (find "$ext_srcdir/components-rs" -name "*.c" -o -name "*.rs" -o -name "Cargo.toml"; find "$ext_srcdir/../../libdatadog" -name "*.rs" -not -path "*/target/*"; find "$ext_srcdir/libdatadog" -name "*.rs" -not -path "*/target/*"; echo "$all_object_files" ) | xargs )
-	(cd "$ext_srcdir/components-rs"; $ddtrace_mock_sources CARGO_TARGET_DIR=\$(builddir)/target/ \$(DDTRACE_CARGO) build $(test "$ddtrace_cargo_profile" == debug || echo --profile tracer-release) \$(shell echo "\$(MAKEFLAGS)" | $EGREP -o "[[-]]j[[0-9]]+") && test "$PHP_DDTRACE_RUST_SYMBOLS" == yes || strip -d \$(builddir)/target/$ddtrace_cargo_profile/libddtrace_php.a)
+	(cd "$ext_srcdir/components-rs"; $ddtrace_mock_sources CARGO_TARGET_DIR=\$(builddir)/target/ \$(DDTRACE_CARGO) build --package ddtrace-php $(test "$ddtrace_cargo_profile" == debug || echo --profile tracer-release) \$(shell echo "\$(MAKEFLAGS)" | $EGREP -o "[[-]]j[[0-9]]+") && test "$PHP_DDTRACE_RUST_SYMBOLS" == yes || strip -d \$(builddir)/target/$ddtrace_cargo_profile/libddtrace_php.a)
 EOT
 
   if test "$ext_shared" = "shared" || test "$ext_shared" = "yes"; then

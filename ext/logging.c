@@ -1,15 +1,19 @@
 #include "logging.h"
 
-#include <stdatomic.h>
 #include <stdio.h>
 #include <string.h>
 #include <time.h>
+#ifndef _WIN32
+#include <stdatomic.h>
+#else
+#include <components/atomic_win32_polyfill.h>
+#endif
 
 #include "configuration.h"
 
 extern inline void ddtrace_log_err(const char *message);
 
-atomic_uintptr_t php_ini_error_log;
+_Atomic(uintptr_t) php_ini_error_log;
 
 void ddtrace_bgs_log_minit(void) { atomic_store(&php_ini_error_log, (uintptr_t)NULL); }
 
@@ -82,7 +86,7 @@ void ddtrace_log_errf(const char *format, ...) {
     va_end(args);
 }
 
-static atomic_int dd_force_log_once_flag = 1;
+static _Atomic(int) dd_force_log_once_flag = 1;
 void ddtrace_log_onceerrf(const char *format, ...) {
     va_list args;
     char *buffer;

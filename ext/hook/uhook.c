@@ -488,7 +488,7 @@ type_error:
     } else {
         const char *colon = strchr(ZSTR_VAL(name), ':');
         zai_string_view scope = ZAI_STRING_EMPTY, function = {.ptr = ZSTR_VAL(name), .len = ZSTR_LEN(name)};
-        if (colon) {
+        if (colon && colon[1] == ':') {
             def->scope = zend_string_init(function.ptr, colon - ZSTR_VAL(name), 0);
             do ++colon; while (*colon == ':');
             def->function = zend_string_init(colon, ZSTR_VAL(name) + ZSTR_LEN(name) - colon, 0);
@@ -498,19 +498,17 @@ type_error:
             def->scope = NULL;
             if (ZSTR_LEN(name) == 0 || strchr(ZSTR_VAL(name), '.')) {
                 def->function = NULL;
-                if (ZSTR_LEN(name) > 2 && ZSTR_VAL(name)[0] == '.' && (ZSTR_VAL(name)[1] == '/' || ZSTR_VAL(name)[1] == '\\'
+                char resolved_path_buf[MAXPATHLEN];
+                if (ZSTR_LEN(name) > 0 && VCWD_REALPATH(ZSTR_VAL(name), resolved_path_buf)) {
+                    def->file = zend_string_init(resolved_path_buf, strlen(resolved_path_buf), 0);
+                } else if (ZSTR_LEN(name) > 2 && ZSTR_VAL(name)[0] == '.' && (ZSTR_VAL(name)[1] == '/' || ZSTR_VAL(name)[1] == '\\'
                      || (ZSTR_VAL(name)[1] == '.' && (ZSTR_VAL(name)[2] == '/' || ZSTR_VAL(name)[2] == '\\')))) { // relative path handling
-                    char resolved_path_buf[MAXPATHLEN];
-                    if (VCWD_REALPATH(ZSTR_VAL(name), resolved_path_buf)) {
-                        def->file = zend_string_init(resolved_path_buf, strlen(resolved_path_buf), 0);
-                    } else {
-                        ddtrace_log_onceerrf("Could not add hook to file path %s, could not resolve path", ZSTR_VAL(name));
-                        goto error;
-                    }
+                    ddtrace_log_onceerrf("Could not add hook to file path %s, could not resolve path", ZSTR_VAL(name));
+                    goto error;
                 } else {
                     def->file = zend_string_copy(name);
                 }
-                function = ZAI_STRING_EMPTY;
+                function = (zai_string_view)ZAI_STRING_EMPTY;
             } else {
                 def->function = zend_string_init(function.ptr, function.len, 0);
             }

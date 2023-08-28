@@ -7,20 +7,20 @@
 #undef INTEGRATION
 
 #define DDTRACE_DEFERRED_INTEGRATION_LOADER(class, fname, integration_name)             \
-    dd_hook_method_and_unhook_on_first_call(ZAI_STRL_VIEW(class), ZAI_STRL_VIEW(fname), \
-                          ZAI_STRL_VIEW(integration_name), (ddtrace_integration_name)-1, false)
+    dd_hook_method_and_unhook_on_first_call((zai_string_view)ZAI_STRL_VIEW(class), (zai_string_view)ZAI_STRL_VIEW(fname), \
+                          (zai_string_view)ZAI_STRL_VIEW(integration_name), (ddtrace_integration_name)-1, false)
 
 #define DD_SET_UP_DEFERRED_LOADING_BY_METHOD(name, Class, fname, integration)                                \
-    dd_set_up_deferred_loading_by_method(name, ZAI_STRL_VIEW(Class), ZAI_STRL_VIEW(fname), \
-                                         ZAI_STRL_VIEW(integration), false)
+    dd_set_up_deferred_loading_by_method(name, (zai_string_view)ZAI_STRL_VIEW(Class), (zai_string_view)ZAI_STRL_VIEW(fname), \
+                                         (zai_string_view)ZAI_STRL_VIEW(integration), false)
 
 #define DD_SET_UP_DEFERRED_LOADING_BY_METHOD_POST(name, Class, fname, integration)                                \
-    dd_set_up_deferred_loading_by_method(name, ZAI_STRL_VIEW(Class), ZAI_STRL_VIEW(fname), \
-                                         ZAI_STRL_VIEW(integration), true)
+    dd_set_up_deferred_loading_by_method(name, (zai_string_view)ZAI_STRL_VIEW(Class), (zai_string_view)ZAI_STRL_VIEW(fname), \
+                                         (zai_string_view)ZAI_STRL_VIEW(integration), true)
 
 #define DD_SET_UP_DEFERRED_LOADING_BY_FUNCTION(name, fname, integration)                           \
-    dd_set_up_deferred_loading_by_method(name, ZAI_STRING_EMPTY, ZAI_STRL_VIEW(fname), \
-                                         ZAI_STRL_VIEW(integration), false)
+    dd_set_up_deferred_loading_by_method(name, (zai_string_view)ZAI_STRING_EMPTY, (zai_string_view)ZAI_STRL_VIEW(fname), \
+                                         (zai_string_view)ZAI_STRL_VIEW(integration), false)
 
 #define INTEGRATION(id, lcname)                                        \
     {                                                                  \

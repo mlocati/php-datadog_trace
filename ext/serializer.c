@@ -16,7 +16,13 @@
 #include <SAPI.h>
 #include <exceptions/exceptions.h>
 #include <json/json.h>
+#ifndef _WIN32
 #include <stdatomic.h>
+#else
+#include <components/atomic_win32_polyfill.h>
+#include <synchapi.h>
+#endif
+#include <vendor/mpack/mpack.h>
 #include <zai_string/string.h>
 #include <sandbox/sandbox.h>
 
@@ -27,10 +33,10 @@
 #include "engine_hooks.h"
 #include "ip_extraction.h"
 #include "logging.h"
-#include "mpack/mpack.h"
 #include "priority_sampling/priority_sampling.h"
 #include "span.h"
 #include "uri_normalization.h"
+#include "zend_hrtime.h"
 
 ZEND_EXTERN_MODULE_GLOBALS(ddtrace);
 
@@ -130,8 +136,8 @@ static int msgpack_write_zval(mpack_writer_t *writer, zval *trace, int level) {
             break;
         default:
             ddtrace_log_debug("Serialize values must be of type array, string, int, float, bool or null");
+            mpack_writer_flag_error(writer, mpack_error_type);
             return 0;
-            break;
     }
     return 1;
 }
@@ -969,12 +975,16 @@ static bool dd_rule_matches(zval *pattern, zend_string* value) {
 
 static HashTable dd_span_sampling_limiters;
 #if ZTS
+#ifndef _WIN32
 static pthread_rwlock_t dd_span_sampling_limiter_lock;
+#else
+static SRWLOCK dd_span_sampling_limiter_lock;
+#endif
 #endif
 
 struct dd_sampling_bucket {
-    _Atomic int64_t hit_count;
-    _Atomic uint64_t last_update;
+    _Atomic(int64_t) hit_count;
+    _Atomic(uint64_t) last_update;
 };
 
 void ddtrace_clear_span_sampling_limiter(zval *zv) {
@@ -983,14 +993,18 @@ void ddtrace_clear_span_sampling_limiter(zval *zv) {
 
 void ddtrace_initialize_span_sampling_limiter(void) {
 #if ZTS
+#ifndef _WIN32
     pthread_rwlock_init(&dd_span_sampling_limiter_lock, NULL);
+#else
+    InitializeSRWLock(&dd_span_sampling_limiter_lock);
+#endif
 #endif
 
     zend_hash_init(&dd_span_sampling_limiters, 8, obsolete, ddtrace_clear_span_sampling_limiter, 1);
 }
 
 void ddtrace_shutdown_span_sampling_limiter(void) {
-#if ZTS
+#if ZTS && !defined(_WIN32)
     pthread_rwlock_destroy(&dd_span_sampling_limiter_lock);
 #endif
 
@@ -1083,8 +1097,8 @@ void ddtrace_serialize_span_to_array(ddtrace_span_data *span, zval *array) {
     // Notify profiling for Endpoint Profiling.
     if (profiling_notify_trace_finished && top_level_span && Z_TYPE(prop_resource_as_string) == IS_STRING) {
         zai_string_view type = Z_TYPE(prop_type_as_string) == IS_STRING
-                               ? ZAI_STRING_FROM_ZSTR(Z_STR(prop_type_as_string))
-                               : ZAI_STRL_VIEW("custom");
+                               ? (zai_string_view)ZAI_STRING_FROM_ZSTR(Z_STR(prop_type_as_string))
+                               : (zai_string_view)ZAI_STRL_VIEW("custom");
         zai_string_view resource = ZAI_STRING_FROM_ZSTR(Z_STR(prop_resource_as_string));
         ddtrace_log_debug("Notifying profiler of finished local root span.");
         profiling_notify_trace_finished(span->span_id, type, resource);
@@ -1148,16 +1162,22 @@ void ddtrace_serialize_span_to_array(ddtrace_span_data *span, zval *array) {
                 ZSTR_VAL(rule_key)[ZSTR_LEN(rule_key)] = 0;
 
 #if ZTS
+#ifndef _WIN32
                 pthread_rwlock_rdlock(&dd_span_sampling_limiter_lock);
+#else
+                AcquireSRWLockShared(&dd_span_sampling_limiter_lock);
+#endif
 #endif
                 struct dd_sampling_bucket *sampling_bucket = zend_hash_find_ptr(&dd_span_sampling_limiters, rule_key);
 #if ZTS
+#ifndef _WIN32
                 pthread_rwlock_unlock(&dd_span_sampling_limiter_lock);
+#else
+                ReleaseSRWLockShared(&dd_span_sampling_limiter_lock);
+#endif
 #endif
 
-                struct timespec timespec;
-                clock_gettime(CLOCK_MONOTONIC, &timespec);
-                uint64_t timeval = timespec.tv_sec * 1000000000 + timespec.tv_nsec;
+                uint64_t timeval = zend_hrtime();
 
                 if (!sampling_bucket) {
                     struct dd_sampling_bucket *new_sampling_bucket = malloc(sizeof(*new_sampling_bucket));
@@ -1165,22 +1185,28 @@ void ddtrace_serialize_span_to_array(ddtrace_span_data *span, zval *array) {
                     new_sampling_bucket->last_update = timeval;
 
 #if ZTS
+#ifndef _WIN32
                     pthread_rwlock_wrlock(&dd_span_sampling_limiter_lock);
+#else
+                    AcquireSRWLockExclusive(&dd_span_sampling_limiter_lock);
+#endif
 #endif
                     if (!zend_hash_add_ptr(&dd_span_sampling_limiters, rule_key, new_sampling_bucket)) {
                         free(new_sampling_bucket);
                         sampling_bucket = zend_hash_find_ptr(&dd_span_sampling_limiters, rule_key);
                     }
 #if ZTS
+#ifndef _WIN32
                     pthread_rwlock_unlock(&dd_span_sampling_limiter_lock);
+#else
+                    ReleaseSRWLockExclusive(&dd_span_sampling_limiter_lock);
+#endif
 #endif
                 }
 
                 zend_string_release(rule_key);
 
                 if (sampling_bucket) {
-                    const int nanosecond = 1000000000;
-
                     // restore allowed time basis
                     uint64_t old_time = atomic_exchange(&sampling_bucket->last_update, timeval);
                     int64_t clear_counter = (int64_t)((long double)(timeval - old_time) * max_per_second);
@@ -1190,9 +1216,9 @@ void ddtrace_serialize_span_to_array(ddtrace_span_data *span, zval *array) {
                         atomic_fetch_add(&sampling_bucket->hit_count, previous_hits > 0 ? clear_counter - previous_hits : clear_counter);
                     }
 
-                    previous_hits = atomic_fetch_add(&sampling_bucket->hit_count, nanosecond);
-                    if ((long double)previous_hits / nanosecond >= max_per_second) {
-                        atomic_fetch_sub(&sampling_bucket->hit_count, nanosecond);
+                    previous_hits = atomic_fetch_add(&sampling_bucket->hit_count, ZEND_NANO_IN_SEC);
+                    if ((long double)previous_hits / ZEND_NANO_IN_SEC >= max_per_second) {
+                        atomic_fetch_sub(&sampling_bucket->hit_count, ZEND_NANO_IN_SEC);
                         break; // limit exceeded
                     }
                 }

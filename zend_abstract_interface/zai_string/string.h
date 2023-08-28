@@ -11,13 +11,13 @@ typedef struct zai_string_view_s {
 } zai_string_view;
 
 #define ZAI_STRL_VIEW(cstr) \
-    (zai_string_view) { .len = sizeof(cstr) - 1, .ptr = (cstr) }
+    { .len = sizeof(cstr) - 1, .ptr = (cstr) }
 
 #define ZAI_STRING_EMPTY \
-    (zai_string_view) { .len = 0, .ptr = "" }
+    { .len = 0, .ptr = "" }
 
 #define ZAI_STRING_FROM_ZSTR(str) \
-    (zai_string_view) { .len = ZSTR_LEN(str), .ptr = ZSTR_VAL(str) }
+    { .len = ZSTR_LEN(str), .ptr = ZSTR_VAL(str) }
 
 static inline bool zai_string_stuffed(zai_string_view s) { return s.ptr && s.len; }
 

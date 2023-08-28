@@ -1,6 +1,6 @@
 #include "priority_sampling.h"
 
-#include <mt19937-64.h>
+#include <vendor/mt19937/mt19937-64.h>
 
 #include <ext/pcre/php_pcre.h>
 #include <json/json.h>

@@ -10,10 +10,10 @@ $args = [
     '-dddtrace.request_init_hook=' . __DIR__ . '/includes/request_init_hook.inc',
 ];
 $env = [
-    'DD_TRACE_DEBUG=1',
-    'DD_AGENT_HOST=invalid_host',
-    'DD_SERVICE_NAME=foo_service',
-    'DD_TRACE_GLOBAL_TAGS=foo:tag',
+    'DD_TRACE_DEBUG' => '1',
+    'DD_AGENT_HOST' => 'invalid_host',
+    'DD_SERVICE_NAME' => 'foo_service',
+    'DD_TRACE_GLOBAL_TAGS' => 'foo:tag',
 ];
 $logs = dd_get_startup_logs($args, $env);
 

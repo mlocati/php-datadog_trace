@@ -21,13 +21,25 @@ static bool zai_config_generate_ini_name(zai_string_view name, zai_config_name *
 
 #if ZTS
 // we need to prevent race conditions between copying the inis and setting the global inis during first rinit
+#ifndef _WIN32
 static pthread_rwlock_t lock_ini_init_rw = PTHREAD_RWLOCK_INITIALIZER;
+#else
+static SRWLOCK lock_ini_init_rw;
+#endif
 static tsrm_thread_end_func_t original_thread_end_handler;
 
 static void zai_config_lock_ini_copying(THREAD_T thread_id) {
+#ifndef _WIN32
     pthread_rwlock_rdlock(&lock_ini_init_rw);
+#else
+    AcquireSRWLockShared(&lock_ini_init_rw);
+#endif
     original_thread_end_handler(thread_id);
+#ifndef _WIN32
     pthread_rwlock_unlock(&lock_ini_init_rw);
+#else
+    ReleaseSRWLockShared(&lock_ini_init_rw);
+#endif
 }
 #endif
 
@@ -39,7 +51,11 @@ int16_t zai_config_initialize_ini_value(zend_ini_entry **entries, int16_t ini_co
     zai_config_memoized_entry *memoized = &zai_config_memoized_entries[entry_id];
 
 #if ZTS
+#ifndef _WIN32
     pthread_rwlock_wrlock(&lock_ini_init_rw);
+#else
+    AcquireSRWLockExclusive(&lock_ini_init_rw);
+#endif
 #endif
 
     int16_t name_index = -1;
@@ -55,7 +71,7 @@ int16_t zai_config_initialize_ini_value(zend_ini_entry **entries, int16_t ini_co
                 // validate
                 zval new_zv;
                 ZVAL_UNDEF(&new_zv);
-                if (!zai_config_decode_value(ZAI_STRING_FROM_ZSTR(ini_str), memoized->type, memoized->parser, &new_zv, true)) {
+                if (!zai_config_decode_value((zai_string_view)ZAI_STRING_FROM_ZSTR(ini_str), memoized->type, memoized->parser, &new_zv, true)) {
                     continue;
                 }
                 zai_config_dtor_pzval(&new_zv);
@@ -79,7 +95,7 @@ int16_t zai_config_initialize_ini_value(zend_ini_entry **entries, int16_t ini_co
             // validate
             zval new_zv;
             ZVAL_UNDEF(&new_zv);
-            if (!zai_config_decode_value(ZAI_STRING_FROM_ZSTR(Z_STR_P(inizv)), memoized->type, memoized->parser, &new_zv, true)) {
+            if (!zai_config_decode_value((zai_string_view)ZAI_STRING_FROM_ZSTR(Z_STR_P(inizv)), memoized->type, memoized->parser, &new_zv, true)) {
                 continue;
             }
             zai_config_dtor_pzval(&new_zv);
@@ -144,7 +160,11 @@ int16_t zai_config_initialize_ini_value(zend_ini_entry **entries, int16_t ini_co
     }
 
 #if ZTS
+#ifndef _WIN32
     pthread_rwlock_unlock(&lock_ini_init_rw);
+#else
+    ReleaseSRWLockExclusive(&lock_ini_init_rw);
+#endif
 #endif
 
     return name_index;
@@ -299,6 +319,9 @@ void zai_config_ini_minit(zai_config_env_to_ini_name env_to_ini, int module_numb
     }
 
 #if ZTS
+#ifdef _WIN32
+    InitializeSRWLock(&lock_ini_init_rw);
+#endif
     original_thread_end_handler = tsrm_set_new_thread_end_handler(zai_config_lock_ini_copying);
 #endif
 }
