@@ -1,0 +1,86 @@
+# GitHub Actions Documentation: https://docs.github.com/en/actions
+
+name: Compile with PECL
+
+on:
+  push:
+    branches:
+      - master
+  pull_request:
+    branches:
+      - master
+
+jobs:
+
+  create-package:
+    name: Create package
+    runs-on: ubuntu-latest
+    steps:
+      - name: Install PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: '7.4'
+          tools: composer:v2
+          coverage: none
+      - name: Checkout
+        uses: actions/checkout@v3
+      - name: Create package
+        run: ./tooling/bin/pecl-build
+      - name: Store package
+        uses: actions/upload-artifact@v3
+        with:
+          name: datadog_trace-package
+          path: datadog_trace-*.tgz
+
+  compile:
+    needs:
+      - create-package
+    strategy:
+      matrix:
+        include:
+          - php-image: php:8.2-cli-alpine3.18
+            install-deps-command: apk add $PHPIZE_DEPS curl-dev cargo
+          - php-image: php:8.2-cli-alpine3.17
+            install-deps-command: apk add $PHPIZE_DEPS curl-dev
+            cargo-version: latest
+          - php-image: "php:8.2-cli-bookworm"
+            install-deps-command: "apt update && apt install -qy libcurl4-openssl-dev"
+            cargo-version: 1.71.0
+    name: "Install with pecl on ${{ matrix.php-image }}"
+    runs-on: "ubuntu-latest"
+    container: ${{ matrix.php-image }}
+    steps:
+      - name: Install system dependencies
+        run: ${{ matrix.install-deps-command }}
+      - name: Install rust
+        if: matrix.cargo-version
+        run: |
+          curl https://sh.rustup.rs -sSf | sh -s -- -qy
+          . "$HOME/.cargo/env"
+          if [ "${{ matrix.cargo-version }}" != latest ]; then
+            rustup default "${{ matrix.cargo-version }}"
+          fi
+          printf '%s' "$PATH" >$GITHUB_PATH
+      - name: Check cargo version
+        run: cargo --version
+      - name: Retrieve package
+        uses: actions/download-artifact@v3
+        with:
+          name: datadog_trace-package
+      - name: "Create temporary directory"
+        run: cd "$(mktemp -d)"
+      - name: Compile package
+        run: printf '' | MAKE="make -j$(nproc)" pecl install $GITHUB_WORKSPACE/datadog_trace-*.tgz
+      - name: "Enable extension"
+        run: docker-php-ext-enable ddtrace
+      - name: "Check for PHP startup warnings"
+        run: |
+          php -d display_errors=stderr -d display_startup_errors=1 -d error_reporting=-1 -r ';' 2>./php-startup-warnings
+          if [ -s ./php-startup-warnings ]; then
+            echo 'The PHP extension was successfully installed, but PHP raised these warnings:' >&2
+            cat ./php-startup-warnings >&2
+            exit 1
+          fi
+          echo "PHP didn't raise any warnings at startup."
+      - name: Inspect extension
+        run: php --ri ddtrace
